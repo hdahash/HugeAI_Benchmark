@@ -1,0 +1,78 @@
+# routerbench configuration for the real hugeai.sa router.
+#
+# Before running:
+#   export HUGEAI_API_KEY="sk-..."
+#
+# hugeai.sa is OpenAI-compatible, so the response_*_path defaults (which
+# match /v1/chat/completions) are left untouched.
+#
+# TODO once you tell routerbench the model names your router routes
+# between: fill in `pricing` below (used for cost metrics) and, if you know
+# which category should route to which model, add "expected_model" back
+# into data/hugeai_prompts.jsonl per item to get routing-accuracy scoring
+# (see data/sample_prompts.jsonl for the field). Until then this config
+# leaves `accuracy`'s routing check unscored (no expected_model in the
+# dataset) but still captures model distribution, quality, latency, and cost.
+
+router:
+  base_url: "https://hugeai.sa"
+  chat_path: "/v1/chat/completions"
+  method: "POST"
+  api_key_env: "HUGEAI_API_KEY"
+  auth_header_name: "Authorization"
+  auth_header_format: "Bearer {api_key}"
+  extra_headers: {}
+  timeout_s: 30.0
+  max_retries: 2
+  retry_backoff_s: 0.5
+  response_model_path: "model"
+  response_content_path: "choices.0.message.content"
+  response_input_tokens_path: "usage.prompt_tokens"
+  response_output_tokens_path: "usage.completion_tokens"
+
+# $ per 1,000 tokens, keyed by the model name hugeai.sa reports in its
+# "model" response field. Fill these in with your actual backend models
+# and their pricing to get meaningful cost-efficiency numbers.
+pricing: {}
+#  gpt-4o-mini:
+#    input_per_1k: 0.00015
+#    output_per_1k: 0.0006
+#  gpt-4o:
+#    input_per_1k: 0.005
+#    output_per_1k: 0.015
+
+# Set once you know which model name represents your most expensive/largest
+# backend, to compute cost savings vs. always routing there.
+baseline_model: null
+
+dataset:
+  path: "data/hugeai_prompts.jsonl"
+
+accuracy:
+  enabled: true
+  name: "routing_accuracy"
+  concurrency: 5
+
+load:
+  enabled: true
+  name: "load_test"
+  concurrency_levels: [1, 5, 20]
+  requests_per_level: 20
+
+reliability:
+  enabled: true
+  name: "reliability"
+  concurrency: 10
+  requests: 30
+  # hugeai.sa has no documented fault-injection contract, so this stays off
+  # by default -- flip to true only if the service special-cases this header.
+  inject_faults: false
+  fault_header: "X-Inject-Fault"
+  request_timeout_s: 10.0
+
+scorer:
+  mode: "heuristic"
+
+output:
+  dir: "reports"
+  formats: ["json", "html"]
