@@ -34,6 +34,18 @@ def _print_summary(scenario_results) -> None:
                 table.add_row("Savings vs baseline", f"{cost['savings_pct']:.1f}%")
             console.print(table)
 
+            regret = scenario.metrics.get("routing_regret")
+            if regret and regret.get("comparable_requests"):
+                regret_table = Table(show_header=True, title="Routing regret vs. baseline")
+                regret_table.add_column("Metric")
+                regret_table.add_column("Value")
+                regret_table.add_row("Comparable requests", str(regret["comparable_requests"]))
+                regret_table.add_row("Avg quality regret", f"{regret['avg_quality_regret']:+.3f}")
+                regret_table.add_row("Requests with no quality loss", f"{regret['pct_no_quality_loss'] * 100:.1f}%")
+                regret_table.add_row("Avg cost savings/request", f"${regret['avg_cost_savings_usd']:.5f}")
+                regret_table.add_row("Total cost savings", f"${regret['total_cost_savings_usd']:.4f}")
+                console.print(regret_table)
+
         elif scenario.scenario_type == "load":
             table = Table(show_header=True)
             table.add_column("Concurrency")

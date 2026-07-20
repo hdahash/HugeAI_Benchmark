@@ -47,19 +47,19 @@ async def run_reliability_scenario(
     fault_items = [dataset[i % len(dataset)] for i in range(fault_n)]
 
     baseline_task = asyncio.gather(*[
-        run_one(ctx, item, "reliability_baseline", semaphore, timeout_s=config.request_timeout_s)
+        run_one(ctx, item, "reliability_baseline", semaphore, timeout_s=config.request_timeout_s, score_quality=False)
         for item in baseline_items
     ])
     fault_task = asyncio.gather(*[
         run_one(
             ctx, item, "reliability_fault_injected", semaphore,
             extra_headers={config.fault_header: "1"},
-            timeout_s=config.request_timeout_s,
+            timeout_s=config.request_timeout_s, score_quality=False,
         )
         for item in fault_items
     ]) if config.inject_faults else asyncio.sleep(0, result=[])
     edge_task = asyncio.gather(*[
-        run_one(ctx, item, "reliability_edge_case", semaphore, timeout_s=config.request_timeout_s)
+        run_one(ctx, item, "reliability_edge_case", semaphore, timeout_s=config.request_timeout_s, score_quality=False)
         for item in EDGE_CASES
     ])
 

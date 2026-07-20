@@ -56,6 +56,11 @@ class AccuracyScenarioConfig:
     enabled: bool = True
     name: str = "routing_accuracy"
     concurrency: int = 5
+    # If true (and baseline_model is set), also fires each prompt forced to
+    # baseline_model and compares quality/cost against the routed response --
+    # this is the only way to tell "cheap and good enough" apart from "cheap
+    # and worse". Roughly doubles request volume for this scenario.
+    compute_routing_regret: bool = False
 
 
 @dataclass
@@ -78,8 +83,63 @@ class ReliabilityScenarioConfig:
 
 
 @dataclass
+class JudgeConfig:
+    """LLM-as-judge scoring for open-ended items (no verifiable ground truth).
+
+    Any field left None inherits the corresponding value from `router:` --
+    by default the judge just calls the same endpoint with a different
+    `model`, which lets the mock router act as its own judge for demo
+    purposes. Point these at a separate, stronger model/endpoint for real use.
+    """
+
+    enabled: bool = False
+    model: str = ""
+    base_url: str | None = None
+    chat_path: str | None = None
+    api_key_env: str | None = None
+    auth_header_name: str | None = None
+    auth_header_format: str | None = None
+    timeout_s: float = 30.0
+    max_retries: int = 1
+    response_content_path: str | None = None
+    default_rubric: str = "Score how helpful, accurate, and relevant this response is to the prompt."
+    rubric: dict[str, str] = field(default_factory=dict)
+
+    def to_router_config(self, base: RouterConfig) -> RouterConfig:
+        return RouterConfig(
+            base_url=self.base_url or base.base_url,
+            chat_path=self.chat_path or base.chat_path,
+            method=base.method,
+            api_key_env=self.api_key_env if self.api_key_env is not None else base.api_key_env,
+            auth_header_name=self.auth_header_name or base.auth_header_name,
+            auth_header_format=self.auth_header_format or base.auth_header_format,
+            timeout_s=self.timeout_s,
+            max_retries=self.max_retries,
+            response_content_path=self.response_content_path or base.response_content_path,
+        )
+
+
+@dataclass
+class CodeExecConfig:
+    """Sandboxed local execution of model-generated code against test cases.
+
+    SECURITY: this runs whatever code the router's model produced. It is
+    isolated with `python -I` (ignores user env/site-packages), a stripped
+    environment, and CPU/memory/wall-clock limits -- but it is a best-effort
+    local sandbox, not a security boundary. Only enable this against
+    ephemeral/disposable infrastructure, never on shared hosts or anywhere
+    with reachable secrets or network access worth protecting.
+    """
+
+    enabled: bool = True
+    timeout_s: float = 5.0
+    memory_limit_mb: int = 256
+    python_executable: str = "python3"
+
+
+@dataclass
 class ScorerConfig:
-    mode: str = "heuristic"  # "heuristic" | "none"
+    mode: str = "auto"  # "auto" (dispatch per item) | "heuristic" | "none"
 
 
 @dataclass
@@ -98,6 +158,8 @@ class BenchmarkConfig:
     load: LoadScenarioConfig = field(default_factory=LoadScenarioConfig)
     reliability: ReliabilityScenarioConfig = field(default_factory=ReliabilityScenarioConfig)
     scorer: ScorerConfig = field(default_factory=ScorerConfig)
+    judge: JudgeConfig = field(default_factory=JudgeConfig)
+    code_exec: CodeExecConfig = field(default_factory=CodeExecConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
 
     @classmethod
@@ -120,6 +182,8 @@ class BenchmarkConfig:
             load=LoadScenarioConfig(**(raw.get("load") or {})),
             reliability=ReliabilityScenarioConfig(**(raw.get("reliability") or {})),
             scorer=ScorerConfig(**(raw.get("scorer") or {})),
+            judge=JudgeConfig(**(raw.get("judge") or {})),
+            code_exec=CodeExecConfig(**(raw.get("code_exec") or {})),
             output=OutputConfig(**(raw.get("output") or {})),
         )
 

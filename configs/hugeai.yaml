@@ -52,6 +52,9 @@ accuracy:
   enabled: true
   name: "routing_accuracy"
   concurrency: 5
+  # Flip to true once baseline_model above is set to a real backend model
+  # name -- doubles request volume for this scenario (routed + forced-baseline).
+  compute_routing_regret: false
 
 load:
   enabled: true
@@ -71,7 +74,31 @@ reliability:
   request_timeout_s: 10.0
 
 scorer:
-  mode: "heuristic"
+  mode: "auto"   # "auto" (dispatch per item) | "heuristic" | "none"
+
+# LLM-as-judge for open-ended items (reasoning/creative/long_context).
+# Disabled until you know a real backend model name to set as `model` below
+# (it inherits base_url/api_key_env from `router:` above, so once `model` is
+# set this will judge responses using your own router with that model forced).
+judge:
+  enabled: false
+  model: ""   # e.g. your largest/most capable backend model
+  default_rubric: "Score 0-10: is this response helpful, accurate, and relevant to the prompt?"
+  rubric:
+    reasoning: "Score 0-10: does the response show valid, step-by-step logical reasoning and reach a correct conclusion?"
+    creative: "Score 0-10: is the response coherent, on-topic, and reasonably creative?"
+    long_context: "Score 0-10: does the response accurately and clearly cover the key trade-offs the prompt asked about?"
+
+# Sandboxed local execution of model-generated code against dataset test
+# cases (see data/hugeai_prompts.jsonl's code-1/code-6). This doesn't need
+# any of the above filled in -- it's self-contained regardless of your
+# backend model names. Read the SECURITY note in
+# routerbench/scoring/code_exec.py before running it anywhere but
+# disposable/ephemeral infrastructure.
+code_exec:
+  enabled: true
+  timeout_s: 5.0
+  memory_limit_mb: 256
 
 output:
   dir: "reports"

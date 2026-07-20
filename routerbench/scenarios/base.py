@@ -8,7 +8,7 @@ from routerbench.client import RouterClient
 from routerbench.config import ModelPricing
 from routerbench.metrics.cost import request_cost_usd
 from routerbench.models import DatasetItem, RequestResult, RequestStatus
-from routerbench.scorer import Scorer
+from routerbench.scoring.base import Scorer
 
 
 @dataclass
@@ -27,6 +27,7 @@ async def run_one(
     extra_headers: dict[str, str] | None = None,
     timeout_s: float | None = None,
     concurrency_level: int | None = None,
+    score_quality: bool = True,
 ) -> RequestResult:
     async with semaphore:
         response = await ctx.client.send(
@@ -41,7 +42,12 @@ async def run_one(
 
     if response.status == RequestStatus.SUCCESS:
         result.cost_usd = request_cost_usd(response.model_used, response.input_tokens, response.output_tokens, ctx.pricing)
-        result.quality_score = ctx.scorer.score(item, response.content)
+        # Quality scoring (especially an LLM judge or code execution) is only
+        # worth its cost/latency where correctness is actually in question --
+        # load and reliability scenarios fire the same prompts repeatedly
+        # just to measure timing/error behavior, not to re-grade them.
+        if score_quality:
+            result.quality_score = await ctx.scorer.score(item, response.content)
         if item.expected_model is not None:
             result.routing_correct = response.model_used == item.expected_model
 

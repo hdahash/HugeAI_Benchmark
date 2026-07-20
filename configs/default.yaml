@@ -45,6 +45,9 @@ accuracy:
   enabled: true
   name: "routing_accuracy"
   concurrency: 5
+  # Also fires each prompt forced to baseline_model and compares quality/cost
+  # against what the router actually chose -- see metrics/regret.py.
+  compute_routing_regret: true
 
 load:
   enabled: true
@@ -62,7 +65,31 @@ reliability:
   request_timeout_s: 5.0
 
 scorer:
-  mode: "heuristic"   # "heuristic" | "none"
+  mode: "auto"   # "auto" (dispatch per item) | "heuristic" | "none"
+
+# LLM-as-judge for open-ended items (reasoning/creative/long_context) that
+# have no verifiable ground truth. Left unset, base_url/chat_path/api_key_env
+# inherit from `router:` above -- here that means the mock router judges its
+# own output using its "large-model" tier, which is enough to demo the
+# scoring path end to end. Point this at a real, separate judge model for
+# anything beyond a demo.
+judge:
+  enabled: true
+  model: "large-model"
+  default_rubric: "Score 0-10: is this response helpful, accurate, and relevant to the prompt?"
+  rubric:
+    reasoning: "Score 0-10: does the response show valid, step-by-step logical reasoning and reach a correct conclusion?"
+    creative: "Score 0-10: is the response coherent, on-topic, and reasonably creative?"
+    long_context: "Score 0-10: does the response accurately and clearly cover the key trade-offs the prompt asked about?"
+
+# Sandboxed local execution of model-generated code against dataset test
+# cases (see data/sample_prompts.jsonl's code-1/code-6 for the schema).
+# Read the SECURITY note in routerbench/scoring/code_exec.py before pointing
+# this at anything other than disposable/ephemeral infrastructure.
+code_exec:
+  enabled: true
+  timeout_s: 5.0
+  memory_limit_mb: 256
 
 output:
   dir: "reports"

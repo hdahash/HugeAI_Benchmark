@@ -69,6 +69,35 @@ HTML_TEMPLATE = """<!doctype html>
     <tr><td>{{ model }}</td><td>{{ stats.count }}</td><td>${{ "%.4f"|format(stats.total_cost_usd) }}</td></tr>
     {% endfor %}
   </table>
+
+  {% if scenario.metrics.quality.by_category %}
+  <h3>Quality score by category</h3>
+  <table>
+    <tr><th>Category</th><th>Avg quality score</th></tr>
+    {% for cat, score in scenario.metrics.quality.by_category.items() %}
+    <tr><td>{{ cat }}</td><td>{{ "%.2f"|format(score) }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  {% if scenario.metrics.routing_regret and scenario.metrics.routing_regret.comparable_requests %}
+  <h3>Routing regret vs. baseline</h3>
+  <p class="muted">Positive quality regret = router scored lower than the baseline would have on that item. Positive cost savings = router was cheaper than the baseline.</p>
+  <div class="metric-grid">
+    <div class="metric-card"><div class="label">Avg Quality Regret</div><div class="value">{{ "%+.3f"|format(scenario.metrics.routing_regret.avg_quality_regret) }}</div></div>
+    <div class="metric-card"><div class="label">No Quality Loss</div><div class="value">{{ "%.1f"|format(scenario.metrics.routing_regret.pct_no_quality_loss * 100) }}%</div></div>
+    <div class="metric-card"><div class="label">Total Cost Savings</div><div class="value">${{ "%.4f"|format(scenario.metrics.routing_regret.total_cost_savings_usd) }}</div></div>
+  </div>
+  <table>
+    <tr><th>Item</th><th>Category</th><th>Routed model</th><th>Baseline model</th><th>Quality regret</th><th>Cost savings (USD)</th></tr>
+    {% for item in scenario.metrics.routing_regret.worst_regret_items %}
+    <tr>
+      <td>{{ item.id }}</td><td>{{ item.category }}</td><td>{{ item.routed_model }}</td><td>{{ item.baseline_model }}</td>
+      <td>{{ "%+.3f"|format(item.quality_regret) }}</td><td>${{ "%.5f"|format(item.cost_savings_usd) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
 {% endif %}
 
 {% if scenario.scenario_type == "load" %}

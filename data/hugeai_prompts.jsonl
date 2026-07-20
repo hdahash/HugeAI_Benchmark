@@ -4,7 +4,7 @@
 {"id": "qa-4", "category": "simple_qa", "complexity": "low", "prompt": "What is the chemical symbol for gold?", "expected_answer_contains": ["Au"]}
 {"id": "qa-5", "category": "simple_qa", "complexity": "low", "prompt": "Who wrote the play Romeo and Juliet?", "expected_answer_contains": ["Shakespeare"]}
 {"id": "qa-6", "category": "simple_qa", "complexity": "low", "prompt": "What is the boiling point of water in Celsius?", "expected_answer_contains": ["100"]}
-{"id": "code-1", "category": "coding", "complexity": "medium", "prompt": "Write a Python function that checks whether a string is a palindrome, ignoring case and spaces.", "expected_answer_contains": ["def"]}
+{"id": "code-1", "category": "coding", "complexity": "medium", "prompt": "Write a Python function that checks whether a string is a palindrome, ignoring case and spaces.", "expected_answer_contains": [], "metadata": {"entry_point": "is_palindrome", "test_cases": [{"call": "is_palindrome('A man a plan a canal Panama')", "expected": true}, {"call": "is_palindrome('hello')", "expected": false}, {"call": "is_palindrome('racecar')", "expected": true}]}}
 {"id": "code-2", "category": "coding", "complexity": "medium", "prompt": "Fix the bug in this code: def add(a, b): return a - b", "expected_answer_contains": ["def"]}
 {"id": "code-3", "category": "coding", "complexity": "medium", "prompt": "Write a regex pattern that matches a valid email address.", "expected_answer_contains": []}
 {"id": "code-4", "category": "coding", "complexity": "medium", "prompt": "Explain what this SQL query does: SELECT name, COUNT(*) FROM orders GROUP BY name HAVING COUNT(*) > 5", "expected_answer_contains": []}
@@ -20,5 +20,5 @@
 {"id": "creative-2", "category": "creative", "complexity": "medium", "prompt": "Write a haiku about autumn leaves falling in a quiet forest.", "expected_answer_contains": []}
 {"id": "qa-7", "category": "simple_qa", "complexity": "low", "prompt": "What planet is known as the Red Planet?", "expected_answer_contains": ["Mars"]}
 {"id": "qa-8", "category": "simple_qa", "complexity": "low", "prompt": "What is the freezing point of water in Fahrenheit?", "expected_answer_contains": ["32"]}
-{"id": "code-6", "category": "coding", "complexity": "medium", "prompt": "Write a function that returns the nth Fibonacci number using memoization.", "expected_answer_contains": ["def"]}
+{"id": "code-6", "category": "coding", "complexity": "medium", "prompt": "Write a function that returns the nth Fibonacci number using memoization.", "expected_answer_contains": [], "metadata": {"entry_point": "fib", "test_cases": [{"call": "fib(0)", "expected": 0}, {"call": "fib(1)", "expected": 1}, {"call": "fib(10)", "expected": 55}]}}
 {"id": "reasoning-6", "category": "reasoning", "complexity": "high", "prompt": "Explain step by step why increasing concurrency beyond the number of CPU cores can degrade throughput for a CPU-bound algorithm, deriving the effect from first principles.", "expected_answer_contains": []}

@@ -24,7 +24,7 @@ async def run_load_scenario(
     for level in config.concurrency_levels:
         items = [dataset[i % len(dataset)] for i in range(config.requests_per_level)]
         start = time.perf_counter()
-        results = await run_batch(ctx, items, config.name, level, concurrency_level=level)
+        results = await run_batch(ctx, items, config.name, level, concurrency_level=level, score_quality=False)
         wall_time_s = time.perf_counter() - start
 
         all_results.extend(results)
