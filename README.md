@@ -106,6 +106,19 @@ Then replace `data/sample_prompts.jsonl` with your own dataset (same JSONL
 schema — see below) so `expected_model` and `expected_answer_contains`
 reflect your router's actual intended behavior.
 
+`configs/hugeai.yaml` / `data/hugeai_prompts.jsonl` are a ready-made example
+of this pointed at a real service. `scripts/run_hugeai.sh` sets up the venv,
+installs dependencies, and runs it in one step:
+
+```bash
+export HUGEAI_API_KEY="sk-..."     # your real key -- never hardcode it, never commit it
+./scripts/run_hugeai.sh            # defaults to configs/hugeai.yaml
+./scripts/run_hugeai.sh configs/my-other-config.yaml   # or pass a different config
+```
+
+Run it from a machine that can actually reach your router (your own
+machine, a CI runner) — it does nothing special about network access.
+
 ## Dataset format
 
 One JSON object per line:
