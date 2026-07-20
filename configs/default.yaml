@@ -1,0 +1,69 @@
+# routerbench configuration.
+#
+# Points at the bundled mock router by default so `routerbench run` works
+# out of the box. To benchmark your real router, change `router.base_url`
+# and the `response_*_path` fields to match its actual JSON response shape.
+
+router:
+  base_url: "http://127.0.0.1:8000"
+  chat_path: "/v1/chat/completions"
+  method: "POST"
+  api_key_env: null            # e.g. "ROUTER_API_KEY" -- read from env, never hardcode
+  auth_header_name: "Authorization"
+  auth_header_format: "Bearer {api_key}"
+  extra_headers: {}
+  timeout_s: 10.0
+  max_retries: 2
+  retry_backoff_s: 0.3
+  # Dot-paths resolved against the router's JSON response.
+  response_model_path: "model"
+  response_content_path: "choices.0.message.content"
+  response_input_tokens_path: "usage.prompt_tokens"
+  response_output_tokens_path: "usage.completion_tokens"
+
+# $ per 1,000 tokens, keyed by the model name your router reports in
+# response_model_path. Used for cost-efficiency metrics.
+pricing:
+  small-model:
+    input_per_1k: 0.0001
+    output_per_1k: 0.0002
+  medium-model:
+    input_per_1k: 0.001
+    output_per_1k: 0.002
+  large-model:
+    input_per_1k: 0.005
+    output_per_1k: 0.015
+
+# If set, computes what the accuracy-scenario traffic would have cost had
+# every request been forced to this model, and reports savings vs. that.
+baseline_model: "large-model"
+
+dataset:
+  path: "data/sample_prompts.jsonl"
+
+accuracy:
+  enabled: true
+  name: "routing_accuracy"
+  concurrency: 5
+
+load:
+  enabled: true
+  name: "load_test"
+  concurrency_levels: [1, 5, 20]
+  requests_per_level: 20
+
+reliability:
+  enabled: true
+  name: "reliability"
+  concurrency: 10
+  requests: 30
+  inject_faults: true
+  fault_header: "X-Inject-Fault"
+  request_timeout_s: 5.0
+
+scorer:
+  mode: "heuristic"   # "heuristic" | "none"
+
+output:
+  dir: "reports"
+  formats: ["json", "html"]
