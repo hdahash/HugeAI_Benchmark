@@ -153,6 +153,16 @@ One JSON object per line:
 - `metadata.test_cases` (+ `metadata.entry_point`) is optional — for coding
   items, gives ground-truth execution-based scoring instead of a proxy. See
   "Measuring quality" below.
+- `expected_answer_excludes` is optional — substrings that must NOT appear,
+  symmetric to `expected_answer_contains`. Useful for testing whether an
+  injected instruction can override a server-side policy (e.g. checking a
+  known "no emojis" policy actually holds under a prompt trying to break it —
+  see `data/hugeai_prompts.jsonl`'s `security` category), or whether a PII
+  value leaks into the response unredacted.
+- `conversation` is optional — prior turns before `prompt`, e.g.
+  `[{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]`.
+  `prompt` is always the final user turn actually sent. Omit for the common
+  single-turn case. See `data/hugeai_prompts.jsonl`'s `multi_turn` category.
 
 ## Measuring quality
 
@@ -165,8 +175,9 @@ verifiable checks before subjective ones:
    pass-rate — ground truth, not a proxy. See the `code_exec:` config block
    and the SECURITY note in `routerbench/scoring/code_exec.py` before pointing
    this at anything but disposable/ephemeral infrastructure.
-2. **`expected_answer_contains` present → substring match.** For objective
-   QA where a keyword is enough to catch outright failures.
+2. **`expected_answer_contains` and/or `expected_answer_excludes` present →
+   substring match.** For objective QA where a keyword is enough to catch
+   outright failures, or for checking forbidden content stays out.
 3. **Otherwise, if `judge.enabled` → LLM-as-judge.** For open-ended items
    (reasoning, creative writing, long-context summarization) with no
    verifiable ground truth. Configured via `judge:` in the YAML config —

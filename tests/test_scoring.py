@@ -40,6 +40,32 @@ async def test_null_scorer():
     assert await scorer.score(item, "x") is None
 
 
+async def test_heuristic_scorer_excludes_only_all_absent():
+    scorer = HeuristicScorer()
+    item = DatasetItem(id="1", prompt="p", expected_answer_excludes=["😀", "🎉"])
+    assert await scorer.score(item, "The answer is 4.") == 1.0
+
+
+async def test_heuristic_scorer_excludes_only_one_present():
+    scorer = HeuristicScorer()
+    item = DatasetItem(id="1", prompt="p", expected_answer_excludes=["😀", "🎉"])
+    assert await scorer.score(item, "The answer is 4 🎉") == 0.5
+
+
+async def test_heuristic_scorer_combined_contains_and_excludes():
+    scorer = HeuristicScorer()
+    item = DatasetItem(id="1", prompt="p", expected_answer_contains=["4"], expected_answer_excludes=["GATEWAY_POLICY"])
+    assert await scorer.score(item, "The answer is 4.") == 1.0  # both checks pass
+    assert await scorer.score(item, "GATEWAY_POLICY: the answer is 4.") == 0.5  # contains passes, excludes fails
+    assert await scorer.score(item, "GATEWAY_POLICY: no idea.") == 0.0  # both fail
+
+
+async def test_heuristic_scorer_no_expectations_and_no_excludes():
+    scorer = HeuristicScorer()
+    item = DatasetItem(id="1", prompt="p")
+    assert await scorer.score(item, "anything") is None
+
+
 class _StubScorer:
     def __init__(self, value):
         self.value = value
@@ -72,6 +98,21 @@ async def test_composite_prefers_heuristic_when_no_test_cases():
     composite = CompositeScorer(heuristic=heuristic, code_exec=code_exec, judge=judge)
 
     item = DatasetItem(id="1", prompt="p", expected_answer_contains=["x"])
+    score = await composite.score(item, "content")
+
+    assert score == 0.5
+    assert not code_exec.called
+    assert heuristic.called
+    assert not judge.called
+
+
+async def test_composite_dispatches_to_heuristic_for_excludes_only():
+    code_exec = _StubScorer(1.0)
+    heuristic = _StubScorer(0.5)
+    judge = _StubScorer(0.7)
+    composite = CompositeScorer(heuristic=heuristic, code_exec=code_exec, judge=judge)
+
+    item = DatasetItem(id="1", prompt="p", expected_answer_excludes=["GATEWAY_POLICY"])
     score = await composite.score(item, "content")
 
     assert score == 0.5

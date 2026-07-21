@@ -86,6 +86,63 @@ async def test_cache_bust_disabled_sends_identical_prompt(config):
 
 
 @respx.mock
+async def test_send_with_history_prepends_prior_turns(config):
+    import json as _json
+
+    route = respx.post("http://test-router/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json={"model": "m", "choices": [{"message": {"content": "ok"}}], "usage": {}})
+    )
+    client = RouterClient(config)
+    history = [
+        {"role": "user", "content": "I'm planning a trip to France."},
+        {"role": "assistant", "content": "Paris is a great city to visit."},
+    ]
+    await client.send("What is the capital of the country I mentioned?", history=history)
+    await client.aclose()
+
+    body = _json.loads(route.calls.last.request.content)
+    assert body["messages"] == [
+        {"role": "user", "content": "I'm planning a trip to France."},
+        {"role": "assistant", "content": "Paris is a great city to visit."},
+        {"role": "user", "content": "What is the capital of the country I mentioned?"},
+    ]
+
+
+@respx.mock
+async def test_send_without_history_is_single_turn(config):
+    import json as _json
+
+    route = respx.post("http://test-router/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json={"model": "m", "choices": [{"message": {"content": "ok"}}], "usage": {}})
+    )
+    client = RouterClient(config)
+    await client.send("hi")
+    await client.aclose()
+
+    body = _json.loads(route.calls.last.request.content)
+    assert body["messages"] == [{"role": "user", "content": "hi"}]
+
+
+@respx.mock
+async def test_cache_bust_with_history_only_nonces_final_turn(config):
+    import json as _json
+
+    config.cache_bust = True
+    route = respx.post("http://test-router/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json={"model": "m", "choices": [{"message": {"content": "ok"}}], "usage": {}})
+    )
+    client = RouterClient(config)
+    history = [{"role": "user", "content": "context turn"}, {"role": "assistant", "content": "reply turn"}]
+    await client.send("final question", history=history)
+    await client.aclose()
+
+    body = _json.loads(route.calls.last.request.content)
+    assert body["messages"][0] == {"role": "user", "content": "context turn"}
+    assert body["messages"][1] == {"role": "assistant", "content": "reply turn"}
+    assert body["messages"][2]["content"].startswith("final question\n\n<!-- bench-nonce:")
+
+
+@respx.mock
 async def test_send_success(config):
     respx.post("http://test-router/v1/chat/completions").mock(
         return_value=httpx.Response(

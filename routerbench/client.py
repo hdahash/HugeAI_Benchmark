@@ -43,10 +43,16 @@ class RouterClient:
     async def __aexit__(self, *exc: object) -> None:
         await self.aclose()
 
-    def _build_payload(self, prompt: str, force_model: str | None, extra_headers: dict[str, str] | None) -> tuple[dict, dict]:
-        payload: dict = {
-            "messages": [{"role": "user", "content": prompt}],
-        }
+    def _build_payload(
+        self,
+        prompt: str,
+        force_model: str | None,
+        extra_headers: dict[str, str] | None,
+        history: list[dict[str, str]] | None = None,
+    ) -> tuple[dict, dict]:
+        messages = [dict(turn) for turn in (history or [])]
+        messages.append({"role": "user", "content": prompt})
+        payload: dict = {"messages": messages}
         payload.update(self.config.request_extra_fields)
         if force_model:
             field_name = self.config.request_model_field or "model"
@@ -61,15 +67,17 @@ class RouterClient:
         force_model: str | None = None,
         extra_headers: dict[str, str] | None = None,
         timeout_s: float | None = None,
+        history: list[dict[str, str]] | None = None,
     ) -> RouterResponse:
         request_id = request_id or str(uuid.uuid4())
         if self.config.cache_bust:
             # A fresh nonce every call, independent of request_id (which is
             # often a stable dataset item id reused across runs/scenarios and
             # so would defeat nothing) -- this must guarantee the router
-            # never sees the same prompt text twice.
+            # never sees the same prompt text twice. Only the final turn gets
+            # the nonce; prior conversation turns stay exactly as given.
             prompt = f"{prompt}\n\n<!-- bench-nonce:{uuid.uuid4().hex} -->"
-        payload, headers = self._build_payload(prompt, force_model, extra_headers)
+        payload, headers = self._build_payload(prompt, force_model, extra_headers, history=history)
 
         attempts = 0
         last_error: str | None = None

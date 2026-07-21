@@ -36,6 +36,7 @@ async def run_one(
             force_model=force_model,
             extra_headers=extra_headers,
             timeout_s=timeout_s,
+            history=item.conversation or None,
         )
 
     result = RequestResult(item=item, response=response, scenario=scenario_name, concurrency_level=concurrency_level)

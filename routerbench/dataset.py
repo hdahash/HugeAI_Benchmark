@@ -23,6 +23,8 @@ def load_dataset(path: str | Path) -> list[DatasetItem]:
                     complexity=row.get("complexity"),
                     expected_model=row.get("expected_model"),
                     expected_answer_contains=row.get("expected_answer_contains", []),
+                    expected_answer_excludes=row.get("expected_answer_excludes", []),
+                    conversation=row.get("conversation", []),
                     tags=row.get("tags", []),
                     metadata=row.get("metadata", {}),
                 )

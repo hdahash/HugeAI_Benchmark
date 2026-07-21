@@ -40,6 +40,16 @@ class DatasetItem:
     complexity: str | None = None
     expected_model: str | None = None
     expected_answer_contains: list[str] = field(default_factory=list)
+    # Substrings that must NOT appear in the response -- e.g. testing whether
+    # an injected instruction can override a server-side output policy
+    # (see data/hugeai_prompts.jsonl's "security" category), or whether a
+    # PII value survives redaction into the response. Symmetric to
+    # expected_answer_contains; either or both may be set.
+    expected_answer_excludes: list[str] = field(default_factory=list)
+    # Prior turns before `prompt`, e.g. [{"role": "user", "content": "..."},
+    # {"role": "assistant", "content": "..."}]. Empty for a single-turn item
+    # (the common case) -- `prompt` is always the final user turn sent.
+    conversation: list[dict[str, str]] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
