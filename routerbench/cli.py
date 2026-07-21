@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import sys
+from pathlib import Path
 
 from rich.console import Console
 from rich.table import Table
 
+from routerbench.compare import aggregate_comparison, run_all, save_comparison
 from routerbench.config import BenchmarkConfig
 from routerbench.report import save_report
 from routerbench.runner import BenchmarkRunner
@@ -101,6 +104,117 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _labels_for(configs: list[str], labels: list[str] | None) -> list[str]:
+    if labels:
+        if len(labels) != len(configs):
+            raise SystemExit(f"--labels must have the same count as --configs ({len(configs)})")
+        return labels
+    return [Path(c).stem for c in configs]
+
+
+def _warn_if_datasets_differ(configs: dict[str, BenchmarkConfig]) -> None:
+    paths = {label: cfg.dataset.path for label, cfg in configs.items()}
+    if len(set(paths.values())) > 1:
+        console.print("[bold yellow]Warning:[/bold yellow] providers are using different datasets -- this comparison won't be apples-to-apples:")
+        for label, path in paths.items():
+            console.print(f"  {label}: {path}")
+
+
+def _print_comparison(comparison: dict) -> None:
+    providers = comparison["providers"]
+
+    table = Table(title="Quality & cost", show_header=True)
+    table.add_column("Metric")
+    for p in providers:
+        table.add_column(p)
+    table.add_row(
+        "Avg quality score",
+        *[f"{comparison['quality'][p]:.2f}" if comparison["quality"].get(p) is not None else "n/a" for p in providers],
+    )
+    table.add_row(
+        "Routing accuracy",
+        *[
+            f"{comparison['routing'][p]['accuracy'] * 100:.1f}%"
+            if comparison["routing"].get(p) and comparison["routing"][p].get("accuracy") is not None
+            else "n/a"
+            for p in providers
+        ],
+    )
+    table.add_row(
+        "Total cost (USD)",
+        *[
+            f"${comparison['cost'][p]['total_usd']:.4f}" if comparison["cost"].get(p) and comparison["cost"][p].get("total_usd") is not None else "n/a"
+            for p in providers
+        ],
+    )
+    console.print(table)
+
+    rel_table = Table(title="Reliability", show_header=True)
+    rel_table.add_column("Metric")
+    for p in providers:
+        rel_table.add_column(p)
+    rel_table.add_row(
+        "Success rate",
+        *[
+            f"{comparison['reliability'][p]['success_rate'] * 100:.1f}%"
+            if comparison["reliability"].get(p) and comparison["reliability"][p].get("success_rate") is not None
+            else "n/a"
+            for p in providers
+        ],
+    )
+    console.print(rel_table)
+
+    for level in comparison["concurrency_levels"]:
+        lat_table = Table(title=f"Latency & throughput @ concurrency {level}", show_header=True)
+        lat_table.add_column("Metric")
+        for p in providers:
+            lat_table.add_column(p)
+        stats_by_provider = {p: comparison["latency"].get(p, {}).get(level) for p in providers}
+        lat_table.add_row("Throughput (req/s)", *[f"{s['throughput_rps']:.2f}" if s else "n/a" for s in stats_by_provider.values()])
+        lat_table.add_row("p50 (ms)", *[f"{s['p50_ms']:.0f}" if s else "n/a" for s in stats_by_provider.values()])
+        lat_table.add_row("p95 (ms)", *[f"{s['p95_ms']:.0f}" if s else "n/a" for s in stats_by_provider.values()])
+        lat_table.add_row("Error rate", *[f"{s['error_rate'] * 100:.1f}%" if s else "n/a" for s in stats_by_provider.values()])
+        console.print(lat_table)
+
+
+def cmd_compare_run(args: argparse.Namespace) -> int:
+    labels = _labels_for(args.configs, args.labels)
+    configs = {label: BenchmarkConfig.load(path) for label, path in zip(labels, args.configs)}
+
+    _warn_if_datasets_differ(configs)
+
+    for label, config in configs.items():
+        console.print(f"[bold cyan]Running {label} against {config.router.base_url}[/bold cyan]")
+
+    reports = asyncio.run(run_all(configs))
+    comparison = aggregate_comparison(reports)
+
+    _print_comparison(comparison)
+
+    output_dir = args.output or next(iter(configs.values())).output.dir
+    paths = save_comparison(comparison, output_dir)
+    console.print("\n[bold green]Comparison written:[/bold green]")
+    for p in paths:
+        console.print(f"  {p}")
+
+    return 0
+
+
+def cmd_compare(args: argparse.Namespace) -> int:
+    labels = _labels_for(args.reports, args.labels)
+    reports = {label: json.loads(Path(path).read_text()) for label, path in zip(labels, args.reports)}
+
+    comparison = aggregate_comparison(reports)
+    _print_comparison(comparison)
+
+    paths = save_comparison(comparison, args.output)
+    console.print("\n[bold green]Comparison written:[/bold green]")
+    for p in paths:
+        console.print(f"  {p}")
+
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="routerbench", description="Benchmark an LLM router service.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -108,6 +222,28 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser = sub.add_parser("run", help="Run the benchmark suite defined in a config file.")
     run_parser.add_argument("--config", "-c", default="configs/default.yaml", help="Path to YAML config.")
     run_parser.set_defaults(func=cmd_run)
+
+    compare_run_parser = sub.add_parser(
+        "compare-run", help="Run the benchmark suite against multiple provider configs and compare them."
+    )
+    compare_run_parser.add_argument("--configs", nargs="+", required=True, help="Paths to each provider's YAML config.")
+    compare_run_parser.add_argument(
+        "--labels", nargs="+", default=None, help="Display name per provider (default: config filename stem)."
+    )
+    compare_run_parser.add_argument(
+        "--output", default=None, help="Output dir for the comparison report (default: first config's output.dir)."
+    )
+    compare_run_parser.set_defaults(func=cmd_compare_run)
+
+    compare_parser = sub.add_parser(
+        "compare", help="Compare previously-saved report JSON files (from `routerbench run`) without re-running anything."
+    )
+    compare_parser.add_argument("--reports", nargs="+", required=True, help="Paths to each provider's report-*.json file.")
+    compare_parser.add_argument(
+        "--labels", nargs="+", default=None, help="Display name per provider (default: report filename stem)."
+    )
+    compare_parser.add_argument("--output", default="reports", help="Output dir for the comparison report.")
+    compare_parser.set_defaults(func=cmd_compare)
 
     return parser
 

@@ -209,6 +209,59 @@ each prompt a second time forced to the baseline model, and compares:
 
 This roughly doubles request volume for the accuracy scenario, so it's opt-in.
 
+## Comparing multiple providers
+
+Since routerbench is provider-agnostic, comparing your router against
+competing services is just running the same dataset against multiple
+configs and lining up the results — `routerbench compare-run` does this in
+one step:
+
+```bash
+routerbench compare-run \
+  --configs configs/hugeai.yaml configs/openrouter.yaml configs/martian.yaml \
+  --labels hugeai openrouter martian
+```
+
+This runs each config **sequentially** (never concurrently — each provider
+has its own rate limits tuned for its own account; running them at once
+would just make each look artificially slower under contention with the
+others) against the same dataset, then writes a side-by-side
+`comparison-*.json`/`.html` report: quality, cost, routing accuracy,
+reliability, and latency/throughput at every concurrency level, one column
+per provider. It warns if the configs point at different datasets, since
+that would make the comparison meaningless.
+
+If you'd rather run providers independently (different days, different
+machines) and compare afterward, `routerbench compare` does the same
+aggregation from already-saved `report-*.json` files instead of running
+anything:
+
+```bash
+routerbench compare --reports reports/hugeai-report.json reports/openrouter-report.json \
+  --labels hugeai openrouter
+```
+
+**Provider configs included as a starting point:**
+- `configs/openrouter.yaml` — real, ready to use (OpenRouter's API is
+  well-documented and stable). Requests `"openrouter/auto"`, their own
+  meta-model for automatic routing — the fair comparison point against
+  hugeai's `"auto"`.
+- `configs/martian.yaml`, `configs/not_diamond.yaml`, `configs/portkey.yaml`,
+  `configs/litellm_proxy.yaml` — **templates, not verified configs.** I
+  don't have confident, current knowledge of these services' exact
+  endpoints/auth schemes (they change over time, and LiteLLM Proxy is
+  self-hosted with no fixed URL at all), so these have the routerbench-side
+  settings fully wired up but placeholder `base_url`/`model` values clearly
+  marked `REPLACE_ME` — each file's header comment explains exactly what to
+  verify against that provider's current docs before running it. Not
+  Diamond in particular may need a different integration entirely (see that
+  file's comment) if their API is a routing *recommendation* rather than a
+  full pass-through completions endpoint.
+
+All provider configs point at the same `data/hugeai_prompts.jsonl` by
+default — keep it that way for a fair comparison, or swap in your own
+shared dataset across all of them.
+
 ## Running tests
 
 ```bash
