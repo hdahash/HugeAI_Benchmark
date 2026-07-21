@@ -1,18 +1,9 @@
-# routerbench configuration for the real hugeai.sa router.
+# routerbench configuration for the real hugeai.sa router, adjusted against
+# the actual source at hdahash/hugeai (backend/models/schemas.py,
+# backend/config.py, backend/main.py, backend/core/billing.py).
 #
 # Before running:
 #   export HUGEAI_API_KEY="sk-..."
-#
-# hugeai.sa is OpenAI-compatible, so the response_*_path defaults (which
-# match /v1/chat/completions) are left untouched.
-#
-# TODO once you tell routerbench the model names your router routes
-# between: fill in `pricing` below (used for cost metrics) and, if you know
-# which category should route to which model, add "expected_model" back
-# into data/hugeai_prompts.jsonl per item to get routing-accuracy scoring
-# (see data/sample_prompts.jsonl for the field). Until then this config
-# leaves `accuracy`'s routing check unscored (no expected_model in the
-# dataset) but still captures model distribution, quality, latency, and cost.
 
 router:
   base_url: "https://hugeai.sa"
@@ -25,24 +16,100 @@ router:
   timeout_s: 30.0
   max_retries: 2
   retry_backoff_s: 0.5
+  # Verified against backend/models/schemas.py (Usage/Choice/ChatResponse) --
+  # unchanged from the generic defaults, they already match exactly.
   response_model_path: "model"
   response_content_path: "choices.0.message.content"
   response_input_tokens_path: "usage.prompt_tokens"
   response_output_tokens_path: "usage.completion_tokens"
+  # ChatRequest.model (backend/models/schemas.py) is a REQUIRED field with no
+  # default -- omitting it (routerbench's previous behavior for non-forced
+  # calls) gets a 422 from the real service. "gpt-4" is a deliberate choice,
+  # not an arbitrary placeholder: it's the model the gateway's own code
+  # comments use as the running example of what a customer requests while
+  # the router silently substitutes a cheaper backend (backend/core/billing.py
+  # calculate_customer_price docstring: "customer pays for GPT-4 price, we
+  # route to Gemini and pay 60x less"). Requesting it consistently is what
+  # lets response.model reveal the router's real downgrade behavior per prompt.
+  request_extra_fields:
+    model: "gpt-4"
 
-# $ per 1,000 tokens, keyed by the model name hugeai.sa reports in its
-# "model" response field. Fill these in with your actual backend models
-# and their pricing to get meaningful cost-efficiency numbers.
-pricing: {}
-#  gpt-4o-mini:
-#    input_per_1k: 0.00015
-#    output_per_1k: 0.0006
-#  gpt-4o:
-#    input_per_1k: 0.005
-#    output_per_1k: 0.015
+# $ per 1,000 tokens, keyed by the model name hugeai.sa reports in its "model"
+# response field -- i.e. the ACTUAL backend that served the request (visible
+# in the report's model-distribution table), NOT the "gpt-4" you requested.
+#
+# Two different cost numbers exist in backend/core/billing.py, and this
+# table intentionally uses the one that matches response.model:
+#   - calculate_provider_cost: what hugeai.sa itself pays the real backend
+#     (PROVIDER_COSTS below) -- keyed by the SAME model names response.model
+#     reports, so this is what routerbench can actually price per request.
+#   - calculate_customer_price: what YOU get billed -- a flat
+#     CUSTOMER_PRICING_PER_1M rate based on the "gpt-4" you requested,
+#     completely independent of which backend served it. This framework
+#     doesn't compute that number today (it would be constant per request
+#     given the fixed request_extra_fields.model above, so there'd be
+#     nothing to route-optimize against) -- say if you want it added as a
+#     separate "amount billed" figure alongside the backend-cost numbers below.
+#
+# Values are backend/config.py's PROVIDER_COSTS defaults, converted from
+# per-1M to per-1K. Single blended rate for all tokens (not split
+# input/output), so input_per_1k == output_per_1k -- splitting an identical
+# rate across both still sums to the same total. These are the values
+# shipped in the repo; a deployed .env can override them (pydantic-settings
+# reads env at startup) -- worth spot-checking against an admin/billing
+# endpoint if totals look off. ollama entries are $0 (self-hosted/local).
+pricing:
+  gpt-4: {input_per_1k: 0.03, output_per_1k: 0.03}
+  gpt-4-turbo: {input_per_1k: 0.01, output_per_1k: 0.01}
+  gpt-4o: {input_per_1k: 0.0025, output_per_1k: 0.0025}
+  gpt-4o-mini: {input_per_1k: 0.00015, output_per_1k: 0.00015}
+  gpt-3.5-turbo: {input_per_1k: 0.0005, output_per_1k: 0.0005}
+  claude-3-opus: {input_per_1k: 0.015, output_per_1k: 0.015}
+  claude-3-sonnet: {input_per_1k: 0.003, output_per_1k: 0.003}
+  claude-3-5-sonnet-20241022: {input_per_1k: 0.003, output_per_1k: 0.003}
+  claude-3-haiku: {input_per_1k: 0.00025, output_per_1k: 0.00025}
+  gemini-2.0-flash: {input_per_1k: 0.0001, output_per_1k: 0.0001}
+  gemini-2.0-flash-lite: {input_per_1k: 0.000075, output_per_1k: 0.000075}
+  gemini-1.5-flash: {input_per_1k: 0.000075, output_per_1k: 0.000075}
+  gemini-1.5-flash-8b: {input_per_1k: 0.0000375, output_per_1k: 0.0000375}
+  gemini-1.5-pro: {input_per_1k: 0.00125, output_per_1k: 0.00125}
+  gemini-2.5-pro: {input_per_1k: 0.00125, output_per_1k: 0.00125}
+  gemini-2.5-flash: {input_per_1k: 0.00015, output_per_1k: 0.00015}
+  deepseek-chat: {input_per_1k: 0.00027, output_per_1k: 0.00027}
+  deepseek-reasoner: {input_per_1k: 0.00055, output_per_1k: 0.00055}
+  deepseek-coder: {input_per_1k: 0.00014, output_per_1k: 0.00014}
+  moonshot-v1-8k: {input_per_1k: 0.000012, output_per_1k: 0.000012}
+  moonshot-v1-32k: {input_per_1k: 0.000024, output_per_1k: 0.000024}
+  moonshot-v1-128k: {input_per_1k: 0.00006, output_per_1k: 0.00006}
+  "meta-llama/Llama-3.2-3B-Instruct-Turbo": {input_per_1k: 0.00006, output_per_1k: 0.00006}
+  "meta-llama/Llama-3.3-70B-Instruct-Turbo": {input_per_1k: 0.00088, output_per_1k: 0.00088}
+  "mistralai/Mixtral-8x7B-Instruct-v0.1": {input_per_1k: 0.0006, output_per_1k: 0.0006}
+  "Qwen/Qwen2.5-7B-Instruct-Turbo": {input_per_1k: 0.0003, output_per_1k: 0.0003}
+  "llama3.2:1b": {input_per_1k: 0.0, output_per_1k: 0.0}
+  "llama3.2:3b": {input_per_1k: 0.0, output_per_1k: 0.0}
+  "llama3.1:8b": {input_per_1k: 0.0, output_per_1k: 0.0}
+  "qwen2.5:7b": {input_per_1k: 0.0, output_per_1k: 0.0}
+  "qwen2.5:14b": {input_per_1k: 0.0, output_per_1k: 0.0}
+  "qwen2.5:32b": {input_per_1k: 0.0, output_per_1k: 0.0}
+  "qwen2.5-coder:7b": {input_per_1k: 0.0, output_per_1k: 0.0}
+  "qwen2.5-coder:14b": {input_per_1k: 0.0, output_per_1k: 0.0}
+  "deepseek-coder:6.7b": {input_per_1k: 0.0, output_per_1k: 0.0}
+  "codellama:7b": {input_per_1k: 0.0, output_per_1k: 0.0}
+  "mistral:7b": {input_per_1k: 0.0, output_per_1k: 0.0}
+  "phi3:mini": {input_per_1k: 0.0, output_per_1k: 0.0}
+  "phi3:medium": {input_per_1k: 0.0, output_per_1k: 0.0}
+  "gemma2:9b": {input_per_1k: 0.0, output_per_1k: 0.0}
+  "aya:35b": {input_per_1k: 0.0, output_per_1k: 0.0}
 
-# Set once you know which model name represents your most expensive/largest
-# backend, to compute cost savings vs. always routing there.
+# Found in backend/services/agent_pipeline.py::RouterAgent.route and
+# backend/core/routing.py: there is NO way to force a literal backend model
+# through the public API. ChatRequest.preferred_provider exists in the
+# schema but is only read once in main.py (to skip one internal-pool
+# shortcut) -- IntelligentRouter.select_provider never reads it, so the
+# classifier picks the backend regardless of what you request or prefer.
+# That means force_model-based comparisons (this framework's
+# compute_routing_regret) can't reliably pin a baseline backend here --
+# leaving this unset rather than have it silently measure noise.
 baseline_model: null
 
 dataset:
@@ -52,8 +119,9 @@ accuracy:
   enabled: true
   name: "routing_accuracy"
   concurrency: 5
-  # Flip to true once baseline_model above is set to a real backend model
-  # name -- doubles request volume for this scenario (routed + forced-baseline).
+  # Leave false -- see the baseline_model comment above: this router has no
+  # mechanism to force a literal backend, so a forced-baseline comparison
+  # wouldn't be a reliable apples-to-apples measurement here.
   compute_routing_regret: false
 
 load:
