@@ -38,6 +38,13 @@ pricing:
 # every request been forced to this model, and reports savings vs. that.
 baseline_model: "large-model"
 
+# Caps aggregate request rate across all scenarios + judge calls -- unset
+# (no throttling) is fine for the local mock router. Set this to a real
+# rate-limited service's actual limit (with headroom) to avoid self-inflicted
+# 429s contaminating the load/reliability numbers -- see configs/hugeai.yaml
+# for a worked example.
+rate_limit_rps: null
+
 dataset:
   path: "data/sample_prompts.jsonl"
 

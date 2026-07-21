@@ -12,6 +12,42 @@ def config():
     return RouterConfig(base_url="http://test-router", max_retries=1, retry_backoff_s=0.01, timeout_s=1.0)
 
 
+class _CountingRateLimiter:
+    def __init__(self):
+        self.calls = 0
+
+    async def acquire(self):
+        self.calls += 1
+
+
+@respx.mock
+async def test_rate_limiter_called_once_per_attempt(config):
+    route = respx.post("http://test-router/v1/chat/completions")
+    route.side_effect = [
+        httpx.Response(500),
+        httpx.Response(200, json={"model": "m", "choices": [{"message": {"content": "ok"}}], "usage": {}}),
+    ]
+    limiter = _CountingRateLimiter()
+    client = RouterClient(config, rate_limiter=limiter)
+    response = await client.send("hi")
+    await client.aclose()
+
+    assert response.status == RequestStatus.SUCCESS
+    assert response.attempts == 2
+    assert limiter.calls == 2  # once per physical HTTP attempt, including the retry
+
+
+@respx.mock
+async def test_no_rate_limiter_by_default(config):
+    respx.post("http://test-router/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json={"model": "m", "choices": [{"message": {"content": "ok"}}], "usage": {}})
+    )
+    client = RouterClient(config)  # rate_limiter=None
+    response = await client.send("hi")
+    await client.aclose()
+    assert response.status == RequestStatus.SUCCESS
+
+
 @respx.mock
 async def test_send_success(config):
     respx.post("http://test-router/v1/chat/completions").mock(

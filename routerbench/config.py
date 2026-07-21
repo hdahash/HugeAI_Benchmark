@@ -153,6 +153,12 @@ class BenchmarkConfig:
     router: RouterConfig = field(default_factory=RouterConfig)
     pricing: dict[str, ModelPricing] = field(default_factory=dict)
     baseline_model: str | None = None
+    # Caps aggregate request rate across ALL traffic this run generates
+    # (accuracy + load + reliability + judge calls) -- the limit lives on the
+    # service's account, not per scenario, so it's enforced globally via one
+    # shared RateLimiter rather than per-scenario. None disables throttling
+    # (fine for a local mock router; set this for a real, rate-limited service).
+    rate_limit_rps: float | None = None
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     accuracy: AccuracyScenarioConfig = field(default_factory=AccuracyScenarioConfig)
     load: LoadScenarioConfig = field(default_factory=LoadScenarioConfig)
@@ -177,6 +183,7 @@ class BenchmarkConfig:
             router=RouterConfig.from_dict(raw.get("router") or {}),
             pricing=pricing,
             baseline_model=raw.get("baseline_model"),
+            rate_limit_rps=raw.get("rate_limit_rps"),
             dataset=DatasetConfig(**(raw.get("dataset") or {})),
             accuracy=AccuracyScenarioConfig(**(raw.get("accuracy") or {})),
             load=LoadScenarioConfig(**(raw.get("load") or {})),

@@ -5,10 +5,27 @@ from routerbench.config import ModelPricing
 from routerbench.models import RequestResult, RequestStatus
 
 
+def resolve_pricing_key(model: str, pricing: dict[str, ModelPricing]) -> str | None:
+    """Match a reported model name against the pricing table.
+
+    Real APIs often echo a dated snapshot ("gpt-4o-2024-08-06") even when the
+    pricing table is keyed by the bare family name ("gpt-4o"). Falls back to
+    the longest pricing key that the reported model starts with, so a more
+    specific key (e.g. "gpt-4o" over "gpt-4") wins when both would match.
+    """
+    if model in pricing:
+        return model
+    candidates = [key for key in pricing if model.startswith(key)]
+    return max(candidates, key=len) if candidates else None
+
+
 def request_cost_usd(model: str | None, input_tokens: int, output_tokens: int, pricing: dict[str, ModelPricing]) -> float | None:
-    if model is None or model not in pricing:
+    if model is None:
         return None
-    p = pricing[model]
+    key = resolve_pricing_key(model, pricing)
+    if key is None:
+        return None
+    p = pricing[key]
     return (input_tokens / 1000) * p.input_per_1k + (output_tokens / 1000) * p.output_per_1k
 
 

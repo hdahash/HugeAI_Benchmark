@@ -16,11 +16,13 @@ import httpx
 
 from routerbench.config import RouterConfig, get_by_path
 from routerbench.models import RequestStatus, RouterResponse
+from routerbench.ratelimit import RateLimiter
 
 
 class RouterClient:
-    def __init__(self, config: RouterConfig):
+    def __init__(self, config: RouterConfig, rate_limiter: RateLimiter | None = None):
         self.config = config
+        self._rate_limiter = rate_limiter
         headers = dict(config.extra_headers)
         if config.api_key_env:
             api_key = os.environ.get(config.api_key_env)
@@ -69,6 +71,8 @@ class RouterClient:
 
         while attempts <= self.config.max_retries:
             attempts += 1
+            if self._rate_limiter is not None:
+                await self._rate_limiter.acquire()
             start = time.perf_counter()
             try:
                 resp = await self._client.request(

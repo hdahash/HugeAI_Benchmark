@@ -64,6 +64,26 @@ def test_request_cost_usd_unknown_model():
     assert request_cost_usd("unknown", 100, 100, {}) is None
 
 
+def test_request_cost_usd_prefix_fallback_for_dated_snapshot():
+    pricing = {"gpt-4o": ModelPricing(input_per_1k=0.0025, output_per_1k=0.0025)}
+    cost = request_cost_usd("gpt-4o-2024-08-06", 1000, 1000, pricing)
+    assert cost == 0.0025 + 0.0025
+
+
+def test_request_cost_usd_prefix_fallback_picks_longest_match():
+    pricing = {
+        "gpt-4": ModelPricing(input_per_1k=0.03, output_per_1k=0.03),
+        "gpt-4o": ModelPricing(input_per_1k=0.0025, output_per_1k=0.0025),
+    }
+    cost = request_cost_usd("gpt-4o-2024-08-06", 1000, 0, pricing)
+    assert cost == 0.0025  # matched "gpt-4o", not the shorter "gpt-4"
+
+
+def test_request_cost_usd_no_prefix_match():
+    pricing = {"claude-3-haiku": ModelPricing(input_per_1k=0.00025, output_per_1k=0.00025)}
+    assert request_cost_usd("gpt-4o-2024-08-06", 100, 100, pricing) is None
+
+
 def test_cost_summary_with_baseline():
     r1 = make_result("r1", "small-model")
     r1.cost_usd = 0.001

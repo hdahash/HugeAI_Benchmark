@@ -112,6 +112,14 @@ pricing:
 # leaving this unset rather than have it silently measure noise.
 baseline_model: null
 
+# backend/config.py sets RATE_LIMIT_MAX_REQUESTS: 120 / RATE_LIMIT_WINDOW_SECONDS: 60
+# -- a sustained 2 req/s cap. A full run (accuracy + load + reliability) fires
+# 100+ requests back to back well within that window, which is exactly what
+# produced the HTTP 429s in the first real run against this service. 1.0 req/s
+# leaves real headroom below the 2 req/s ceiling; raise it if 429s stop
+# appearing and you want a faster run, or lower it if they still show up.
+rate_limit_rps: 1.0
+
 dataset:
   path: "data/hugeai_prompts.jsonl"
 
