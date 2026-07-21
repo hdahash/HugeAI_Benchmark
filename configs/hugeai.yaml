@@ -23,16 +23,27 @@ router:
   response_input_tokens_path: "usage.prompt_tokens"
   response_output_tokens_path: "usage.completion_tokens"
   # ChatRequest.model (backend/models/schemas.py) is a REQUIRED field with no
-  # default -- omitting it (routerbench's previous behavior for non-forced
-  # calls) gets a 422 from the real service. "gpt-4" is a deliberate choice,
-  # not an arbitrary placeholder: it's the model the gateway's own code
-  # comments use as the running example of what a customer requests while
-  # the router silently substitutes a cheaper backend (backend/core/billing.py
-  # calculate_customer_price docstring: "customer pays for GPT-4 price, we
-  # route to Gemini and pay 60x less"). Requesting it consistently is what
-  # lets response.model reveal the router's real downgrade behavior per prompt.
+  # default -- omitting it gets a 422 from the real service, so something
+  # has to go here. It was previously "gpt-4", which turned out to be a bad
+  # choice: it silently disables the router entirely. Traced end to end --
+  #   1. backend/core/classifier.py: any model_hint other than "auto" floors
+  #      the complexity tier score (>= 2.5 for "gpt-4"), overriding even the
+  #      trivial-greeting fast path. Tier >2 skips the local/Ollama cascade.
+  #   2. backend/core/routing.py: "gpt-4" maps unambiguously to the openai
+  #      provider (_get_provider_from_model) and, since the key is
+  #      configured, returns immediately as "model_explicit_selection" --
+  #      *before* the cost-based downgrade logic ever runs.
+  #   3. backend/providers/openai_provider.py::_resolve_model hardcodes
+  #      "gpt-4" -> "gpt-4o" regardless of what was actually requested.
+  # Requesting "gpt-4" on every call means every one of those three layers
+  # gets bypassed on every request -- exactly why the first real runs showed
+  # zero model diversity. "auto" is the one value the classifier and
+  # IntelligentRouter both explicitly treat as "no explicit choice, actually
+  # route me" (classifier.py's model_hint check excludes it from the floor;
+  # routing.py sets explicit_provider = None for it) -- this is what actually
+  # exercises the tier/cascade/downgrade logic instead of routing around it.
   request_extra_fields:
-    model: "gpt-4"
+    model: "auto"
   # backend/config.py: FORCE_CACHE_ENABLED = True overrides whatever this
   # client sends for enable_cache, and CACHE_TTL = 86400 (24h). The cache
   # lookup (main.py Phase 1, smart_cache.get) keys off the exact prompt text
