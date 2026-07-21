@@ -33,6 +33,18 @@ router:
   # lets response.model reveal the router's real downgrade behavior per prompt.
   request_extra_fields:
     model: "gpt-4"
+  # backend/config.py: FORCE_CACHE_ENABLED = True overrides whatever this
+  # client sends for enable_cache, and CACHE_TTL = 86400 (24h). The cache
+  # lookup (main.py Phase 1, smart_cache.get) keys off the exact prompt text
+  # before any server-side rewriting, so an identical prompt sent twice --
+  # even across accuracy/load/reliability scenarios, or across separate runs
+  # within 24h -- comes back from cache near-instantly with cost recorded as
+  # $0 server-side. This is exactly what made the first real run's load-test
+  # numbers look wrong (concurrency=1 latencies far *lower* than the same
+  # prompts had just taken in the accuracy pass moments earlier). Keep this
+  # on for real runs against hugeai.sa; it doesn't change task difficulty,
+  # just appends a fresh nonce so the router never sees a repeat.
+  cache_bust: true
 
 # $ per 1,000 tokens, keyed by the model name hugeai.sa reports in its "model"
 # response field -- i.e. the ACTUAL backend that served the request (visible

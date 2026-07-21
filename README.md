@@ -119,6 +119,24 @@ export HUGEAI_API_KEY="sk-..."     # your real key -- never hardcode it, never c
 Run it from a machine that can actually reach your router (your own
 machine, a CI runner) — it does nothing special about network access.
 
+### Two things worth checking for any real router
+
+- **Rate limiting** (`rate_limit_rps` in the config): a full run fires 100+
+  requests across three scenarios in quick succession. If your router has a
+  requests-per-minute cap, set this comfortably under it (see
+  `configs/hugeai.yaml` for a worked example) or the load/reliability
+  scenarios will report your own self-inflicted 429s as if they were real
+  capacity limits.
+- **Server-side caching** (`router.cache_bust`): if identical prompts get
+  cached and returned near-instantly (common, and sometimes not even
+  disableable by the client — see `configs/hugeai.yaml`'s comment on
+  `FORCE_CACHE_ENABLED`), the load scenario's "throughput" numbers end up
+  measuring cache-hit latency instead of real backend capacity, since the
+  same 24-item dataset gets reused across the accuracy pass and every
+  concurrency level. Setting `cache_bust: true` appends a fresh nonce to
+  every prompt so the router never sees a repeat — same task difficulty,
+  no possibility of a cache hit.
+
 ## Dataset format
 
 One JSON object per line:

@@ -63,6 +63,12 @@ class RouterClient:
         timeout_s: float | None = None,
     ) -> RouterResponse:
         request_id = request_id or str(uuid.uuid4())
+        if self.config.cache_bust:
+            # A fresh nonce every call, independent of request_id (which is
+            # often a stable dataset item id reused across runs/scenarios and
+            # so would defeat nothing) -- this must guarantee the router
+            # never sees the same prompt text twice.
+            prompt = f"{prompt}\n\n<!-- bench-nonce:{uuid.uuid4().hex} -->"
         payload, headers = self._build_payload(prompt, force_model, extra_headers)
 
         attempts = 0

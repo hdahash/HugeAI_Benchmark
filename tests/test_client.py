@@ -49,6 +49,43 @@ async def test_no_rate_limiter_by_default(config):
 
 
 @respx.mock
+async def test_cache_bust_makes_identical_prompts_send_different_bodies():
+    import json as _json
+
+    config = RouterConfig(base_url="http://test-router", cache_bust=True)
+    route = respx.post("http://test-router/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json={"model": "m", "choices": [{"message": {"content": "ok"}}], "usage": {}})
+    )
+    client = RouterClient(config)
+    await client.send("What is the capital of France?", request_id="qa-1")
+    await client.send("What is the capital of France?", request_id="qa-1")
+    await client.aclose()
+
+    bodies = [_json.loads(c.request.content) for c in route.calls]
+    contents = [b["messages"][0]["content"] for b in bodies]
+    assert contents[0] != contents[1]
+    assert "What is the capital of France?" in contents[0]
+    assert "What is the capital of France?" in contents[1]
+
+
+@respx.mock
+async def test_cache_bust_disabled_sends_identical_prompt(config):
+    import json as _json
+
+    route = respx.post("http://test-router/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json={"model": "m", "choices": [{"message": {"content": "ok"}}], "usage": {}})
+    )
+    client = RouterClient(config)  # cache_bust=False (default)
+    await client.send("hello")
+    await client.send("hello")
+    await client.aclose()
+
+    bodies = [_json.loads(c.request.content) for c in route.calls]
+    contents = [b["messages"][0]["content"] for b in bodies]
+    assert contents[0] == contents[1] == "hello"
+
+
+@respx.mock
 async def test_send_success(config):
     respx.post("http://test-router/v1/chat/completions").mock(
         return_value=httpx.Response(

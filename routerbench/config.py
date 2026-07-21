@@ -34,6 +34,15 @@ class RouterConfig:
     response_content_path: str = "choices.0.message.content"
     response_input_tokens_path: str = "usage.prompt_tokens"
     response_output_tokens_path: str = "usage.completion_tokens"
+    # If the router caches responses server-side (many do, sometimes
+    # unconditionally -- see hugeai's FORCE_CACHE_ENABLED, which overrides
+    # whatever the client requests), repeated/identical prompts across
+    # scenarios come back near-instantly from cache instead of hitting the
+    # real backend, silently turning "throughput under load" into "cache-hit
+    # latency". When true, RouterClient appends a fresh per-call nonce to
+    # every prompt so no two requests -- across accuracy/load/reliability, or
+    # across separate runs within the cache's TTL -- are ever identical.
+    cache_bust: bool = False
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "RouterConfig":
