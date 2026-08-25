@@ -13,10 +13,10 @@
 #   export MARTIAN_API_KEY="..."
 
 router:
-  base_url: "https://REPLACE_ME.withmartian.com"   # confirm exact host + version path from their docs
-  chat_path: "/v1/chat/completions"   # Martian's product is generally OpenAI-compatible -- confirm this path
+  base_url: "https://api.edenai.run"   # confirm exact host + version path from their docs
+  chat_path: "/v3/chat/completions"   # Martian's product is generally OpenAI-compatible -- confirm this path
   method: "POST"
-  api_key_env: "MARTIAN_API_KEY"
+  api_key_env: "EdnAI_API_KEY"
   auth_header_name: "Authorization"
   auth_header_format: "Bearer {api_key}"
   extra_headers: {}
@@ -37,7 +37,7 @@ router:
   # bypass their routing the same way "gpt-4" bypassed hugeai's (see
   # configs/hugeai.yaml's comment on that exact failure mode).
   request_extra_fields:
-    model: "REPLACE_ME"
+    model: "@edenai"
   cache_bust: false   # enable if requests appear to cache -- unknown for this service
 
 pricing: {}   # fill in once you know which backend models Martian actually routes you to

@@ -6,10 +6,10 @@
 #   export HUGEAI_API_KEY="sk-..."
 
 router:
-  base_url: "https://hugeai-qe1dxv.cranl.net"
+  base_url: "http://localhost:5000"
   chat_path: "/v1/chat/completions"
   method: "POST"
-  api_key_env: "HUGEAI_API_KEY"
+  api_key_env: "LOCAL_API_KEY"
   auth_header_name: "Authorization"
   auth_header_format: "Bearer {api_key}"
   extra_headers: {}
@@ -98,7 +98,7 @@ pricing:
   gemini-1.5-pro: {input_per_1k: 0.00125, output_per_1k: 0.00125}
   gemini-2.5-pro: {input_per_1k: 0.00125, output_per_1k: 0.00125}
   gemini-2.5-flash: {input_per_1k: 0.00015, output_per_1k: 0.00015}
-
+  
 # Found in backend/services/agent_pipeline.py::RouterAgent.route and
 # backend/core/routing.py: there is NO way to force a literal backend model
 # through the public API. ChatRequest.preferred_provider exists in the

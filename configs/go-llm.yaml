@@ -14,10 +14,10 @@
 #   export LITELLM_PROXY_API_KEY="sk-..."   # the master key or a virtual key from your own litellm config
 
 router:
-  base_url: "http://localhost:4000"   # replace with wherever you deployed your litellm proxy
+  base_url: "https://hugeai-go-fe-cmp-4me0oi.cranl.net"   # replace with wherever you deployed your litellm proxy
   chat_path: "/v1/chat/completions"
   method: "POST"
-  api_key_env: "LITELLM_PROXY_API_KEY"
+  api_key_env: "GO_LLM_API_KEY"
   auth_header_name: "Authorization"
   auth_header_format: "Bearer {api_key}"
   extra_headers: {}
@@ -36,7 +36,7 @@ router:
   # this is entirely up to your own proxy configuration, not something I can
   # fill in for you.
   request_extra_fields:
-    model: "REPLACE_ME"
+    model: "auto"
   cache_bust: false   # litellm proxy supports optional caching -- enable this if you've turned it on in your config
 
 pricing: {}   # fill in per the real models your own config.yaml routes to

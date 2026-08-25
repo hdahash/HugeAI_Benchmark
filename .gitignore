@@ -4,3 +4,4 @@ __pycache__/
 reports/
 *.egg-info/
 .pytest_cache/
+edenai.py
